@@ -182,7 +182,9 @@ class DescribeAnythingModel(nn.Module):
         assert len(image_pils) == len(mask_pils), f"image_pils and mask_pils must have the same length. Got {len(image_pils)} and {len(mask_pils)}."
         image_tensors = [self.get_image_tensor(image_pil, mask_pil, crop_mode=crop_mode, crop_mode2=crop_mode2) for image_pil, mask_pil in zip(image_pils, mask_pils)]
         
-        input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).cuda()
+        # input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).cuda()
+        input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt")
+        input_ids = input_ids.unsqueeze(0).expand(len(image_tensors), -1).cuda()
 
         stop_str = conv.sep if conv.sep_style != SeparatorStyle.TWO else conv.sep2
         keywords = [stop_str]
@@ -220,10 +222,16 @@ class DescribeAnythingModel(nn.Module):
             with torch.inference_mode():
                 output_ids = self.model.generate(**generation_kwargs)
 
-            outputs = self.tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
-            outputs = outputs.strip()
-            if outputs.endswith(stop_str):
-                outputs = outputs[: -len(stop_str)]
-            outputs = outputs.strip()
+            # outputs = self.tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
+            # outputs = outputs.strip()
+            # if outputs.endswith(stop_str):
+            #     outputs = outputs[: -len(stop_str)]
+            # outputs = outputs.strip()
+            outputs = self.tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+            for i in range(len(outputs)):
+                outputs[i] = outputs[i].strip()
+                if outputs[i].endswith(stop_str):
+                    outputs[i] = outputs[i][: -len(stop_str)]
+                outputs[i] = outputs[i].strip()
 
             yield outputs
